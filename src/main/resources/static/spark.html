@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOT CLIMBING — Spark Jobs</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #222222;
+      --accent: #ff4d00;
+      --accent2: #c8f135;
+      --text: #f0f0f0;
+      --muted: #555;
+      --success: #2ecc71;
+      --error: #e74c3c;
+      --running: #f39c12;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,77,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,77,0,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 60px 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 64px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      letter-spacing: 4px;
+      line-height: 1;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .status-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 2px;
+    }
+
+    .section-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    /* 잡 카드 */
+    .job-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .job-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .job-card:hover { border-color: #333; }
+
+    .job-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .job-card:hover::before { opacity: 1; }
+
+    .job-card.running {
+      border-color: var(--running);
+    }
+
+    .job-card.running::before {
+      opacity: 1;
+      background: var(--running);
+    }
+
+    .job-card.done {
+      border-color: var(--success);
+    }
+
+    .job-card.done::before {
+      opacity: 1;
+      background: var(--success);
+    }
+
+    .job-card.failed {
+      border-color: var(--error);
+    }
+
+    .job-card.failed::before {
+      opacity: 1;
+      background: var(--error);
+    }
+
+    .job-info {}
+
+    .job-id {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .job-name {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .job-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .job-status {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-badge {
+      padding: 2px 8px;
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 1px;
+    }
+
+    .status-badge.idle { color: var(--muted); border: 1px solid var(--border); }
+    .status-badge.running { color: var(--running); border: 1px solid var(--running); animation: blink 1s infinite; }
+    .status-badge.done { color: var(--success); border: 1px solid var(--success); }
+    .status-badge.failed { color: var(--error); border: 1px solid var(--error); }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* 실행 버튼 */
+    .btn-run {
+      padding: 12px 24px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      min-width: 120px;
+      text-align: center;
+    }
+
+    .btn-run:hover:not(:disabled) {
+      background: var(--accent);
+      color: #0a0a0a;
+    }
+
+    .btn-run:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .btn-run.running-state {
+      border-color: var(--running);
+      color: var(--running);
+    }
+
+    /* 로그 */
+    .log-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .log-clear {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .log-clear:hover { border-color: var(--muted); color: var(--text); }
+
+    .log-body {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      min-height: 140px;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 12px;
+      animation: slideIn 0.2s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .log-time { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .log-msg { color: var(--text); }
+    .log-msg.success { color: var(--success); }
+    .log-msg.error { color: var(--error); }
+    .log-msg.info { color: var(--accent); }
+    .log-msg.running { color: var(--running); }
+
+    .log-empty {
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 20px 0;
+      text-align: center;
+    }
+
+    @media (max-width: 640px) {
+      .job-card { grid-template-columns: 1fr; }
+      .logo { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">DOT<span>.</span>SPARK</div>
+    <div style="display:flex; align-items:center; gap:24px;">
+      <nav style="display:flex; gap:16px;">
+        <a href="index.html" style="font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">CSV 업로드</a>
+        <a href="spark.html" style="font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--accent); text-decoration:none;">SPARK JOBS</a>
+      </nav>
+      <div class="status-label">
+        <span class="status-dot"></span>SPARK ENGINE
+      </div>
+    </div>
+  </header>
+
+  <div class="section-title">// Spark Jobs</div>
+
+  <div class="job-list" id="job-list">
+
+    <div class="job-card" id="card-accounting-agg">
+      <div class="job-info">
+        <div class="job-id">JOB_001</div>
+        <div class="job-name">회계현황 집계</div>
+        <div class="job-desc">납부방법별 수입/지출 합계 및 일별 매출 집계</div>
+        <div class="job-status">
+          <span class="status-badge idle" id="badge-accounting-agg">IDLE</span>
+        </div>
+      </div>
+      <button class="btn-run" id="btn-accounting-agg" onclick="runJob('accounting-agg', 'JOB_001')">
+        RUN
+      </button>
+    </div>
+
+    <div class="job-card" id="card-attendance-agg">
+      <div class="job-info">
+        <div class="job-id">JOB_002</div>
+        <div class="job-name">출석현황 집계</div>
+        <div class="job-desc">그룹별 방문자 수 및 성별 통계 집계</div>
+        <div class="job-status">
+          <span class="status-badge idle" id="badge-attendance-agg">IDLE</span>
+        </div>
+      </div>
+      <button class="btn-run" id="btn-attendance-agg" onclick="runJob('attendance-agg', 'JOB_002')">
+        RUN
+      </button>
+    </div>
+
+    <div class="job-card" id="card-monthly-report">
+      <div class="job-info">
+        <div class="job-id">JOB_003</div>
+        <div class="job-name">월별 종합 리포트</div>
+        <div class="job-desc">회계 + 출석 데이터 조인 후 월별 종합 통계 생성</div>
+        <div class="job-status">
+          <span class="status-badge idle" id="badge-monthly-report">IDLE</span>
+        </div>
+      </div>
+      <button class="btn-run" id="btn-monthly-report" onclick="runJob('monthly-report', 'JOB_003')">
+        RUN
+      </button>
+    </div>
+
+  </div>
+
+  <!-- 로그 -->
+  <div class="log-section">
+    <div class="log-header">
+      <div class="section-title" style="margin-bottom:0">// 실행 로그</div>
+      <button class="log-clear" onclick="clearLog()">CLEAR</button>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-empty" id="log-empty">대기 중...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function runJob(jobId, jobLabel) {
+    const card = document.getElementById(`card-${jobId}`);
+    const badge = document.getElementById(`badge-${jobId}`);
+    const btn = document.getElementById(`btn-${jobId}`);
+
+    // 상태 → RUNNING
+    setStatus(card, badge, btn, 'running', 'RUNNING');
+    addLog(`${jobLabel} 실행 시작`, 'running');
+
+    try {
+      const res = await fetch(`/api/spark/run/${jobId}`, { method: 'POST' });
+      const text = await res.text();
+
+      if (res.ok) {
+        setStatus(card, badge, btn, 'done', 'DONE');
+        addLog(`${jobLabel} 완료 — ${text}`, 'success');
+      } else {
+        setStatus(card, badge, btn, 'failed', 'FAILED');
+        addLog(`${jobLabel} 실패 — ${res.status} ${text}`, 'error');
+      }
+    } catch (e) {
+      setStatus(card, badge, btn, 'failed', 'FAILED');
+      addLog(`${jobLabel} 오류 — ${e.message}`, 'error');
+    }
+  }
+
+  function setStatus(card, badge, btn, state, label) {
+    // 카드 클래스
+    card.classList.remove('running', 'done', 'failed');
+    if (state !== 'idle') card.classList.add(state);
+
+    // 배지
+    badge.className = `status-badge ${state}`;
+    badge.textContent = label;
+
+    // 버튼
+    btn.disabled = state === 'running';
+    btn.classList.toggle('running-state', state === 'running');
+    btn.textContent = state === 'running' ? '...' : 'RUN';
+  }
+
+  function addLog(msg, type = 'info') {
+    const body = document.getElementById('log-body');
+    const empty = document.getElementById('log-empty');
+    if (empty) empty.remove();
+
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`;
+    body.appendChild(entry);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function clearLog() {
+    document.getElementById('log-body').innerHTML =
+      '<div class="log-empty" id="log-empty">대기 중...</div>';
+  }
+</script>
+</body>
+</html>
